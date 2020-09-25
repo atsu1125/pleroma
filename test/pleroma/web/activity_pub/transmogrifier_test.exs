@@ -268,20 +268,6 @@ defmodule Pleroma.Web.ActivityPub.TransmogrifierTest do
       assert is_nil(modified["bcc"])
     end
 
-    test "it can handle Listen activities" do
-      listen_activity = insert(:listen)
-
-      {:ok, modified} = Transmogrifier.prepare_outgoing(listen_activity.data)
-
-      assert modified["type"] == "Listen"
-
-      user = insert(:user)
-
-      {:ok, activity} = CommonAPI.listen(user, %{"title" => "lain radio episode 1"})
-
-      {:ok, _modified} = Transmogrifier.prepare_outgoing(activity.data)
-    end
-
     test "custom emoji urls are URI encoded" do
       # :dinosaur: filename has a space -> dino walking.gif
       user = insert(:user)
@@ -416,107 +402,6 @@ defmodule Pleroma.Web.ActivityPub.TransmogrifierTest do
       assert capture_log(fn ->
                {:error, _} = Transmogrifier.handle_incoming(data)
              end) =~ "Object containment failed"
-    end
-  end
-
-  describe "fix_explicit_addressing" do
-    setup do
-      user = insert(:user)
-      [user: user]
-    end
-
-    test "moves non-explicitly mentioned actors to cc", %{user: user} do
-      explicitly_mentioned_actors = [
-        "https://pleroma.gold/users/user1",
-        "https://pleroma.gold/user2"
-      ]
-
-      object = %{
-        "actor" => user.ap_id,
-        "to" => explicitly_mentioned_actors ++ ["https://social.beepboop.ga/users/dirb"],
-        "cc" => [],
-        "tag" =>
-          Enum.map(explicitly_mentioned_actors, fn href ->
-            %{"type" => "Mention", "href" => href}
-          end)
-      }
-
-      fixed_object = Transmogrifier.fix_explicit_addressing(object, user.follower_address)
-      assert Enum.all?(explicitly_mentioned_actors, &(&1 in fixed_object["to"]))
-      refute "https://social.beepboop.ga/users/dirb" in fixed_object["to"]
-      assert "https://social.beepboop.ga/users/dirb" in fixed_object["cc"]
-    end
-
-    test "does not move actor's follower collection to cc", %{user: user} do
-      object = %{
-        "actor" => user.ap_id,
-        "to" => [user.follower_address],
-        "cc" => []
-      }
-
-      fixed_object = Transmogrifier.fix_explicit_addressing(object, user.follower_address)
-      assert user.follower_address in fixed_object["to"]
-      refute user.follower_address in fixed_object["cc"]
-    end
-
-    test "removes recipient's follower collection from cc", %{user: user} do
-      recipient = insert(:user)
-
-      object = %{
-        "actor" => user.ap_id,
-        "to" => [recipient.ap_id, "https://www.w3.org/ns/activitystreams#Public"],
-        "cc" => [user.follower_address, recipient.follower_address]
-      }
-
-      fixed_object = Transmogrifier.fix_explicit_addressing(object, user.follower_address)
-
-      assert user.follower_address in fixed_object["cc"]
-      refute recipient.follower_address in fixed_object["cc"]
-      refute recipient.follower_address in fixed_object["to"]
-    end
-  end
-
-  describe "fix_summary/1" do
-    test "returns fixed object" do
-      assert Transmogrifier.fix_summary(%{"summary" => nil}) == %{"summary" => ""}
-      assert Transmogrifier.fix_summary(%{"summary" => "ok"}) == %{"summary" => "ok"}
-      assert Transmogrifier.fix_summary(%{}) == %{"summary" => ""}
-    end
-  end
-
-  describe "fix_url/1" do
-    test "fixes data for object when url is map" do
-      object = %{
-        "url" => %{
-          "type" => "Link",
-          "mimeType" => "video/mp4",
-          "href" => "https://peede8d-46fb-ad81-2d4c2d1630e3-480.mp4"
-        }
-      }
-
-      assert Transmogrifier.fix_url(object) == %{
-               "url" => "https://peede8d-46fb-ad81-2d4c2d1630e3-480.mp4"
-             }
-    end
-
-    test "returns non-modified object" do
-      assert Transmogrifier.fix_url(%{"type" => "Text"}) == %{"type" => "Text"}
-    end
-  end
-
-  describe "get_obj_helper/2" do
-    test "returns nil when cannot normalize object" do
-      assert capture_log(fn ->
-               refute Transmogrifier.get_obj_helper("test-obj-id")
-             end) =~ "Unsupported URI scheme"
-    end
-
-    @tag capture_log: true
-    test "returns {:ok, %Object{}} for success case" do
-      assert {:ok, %Object{}} =
-               Transmogrifier.get_obj_helper(
-                 "https://mstdn.io/users/mayuutann/statuses/99568293732299394"
-               )
     end
   end
 end
