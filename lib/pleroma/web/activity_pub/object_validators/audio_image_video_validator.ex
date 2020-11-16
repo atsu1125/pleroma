@@ -2,7 +2,7 @@
 # Copyright © 2017-2021 Pleroma Authors <https://pleroma.social/>
 # SPDX-License-Identifier: AGPL-3.0-only
 
-defmodule Pleroma.Web.ActivityPub.ObjectValidators.AudioVideoValidator do
+defmodule Pleroma.Web.ActivityPub.ObjectValidators.AudioImageVideoValidator do
   use Ecto.Schema
 
   alias Pleroma.EctoType.ActivityPub.ObjectValidators
@@ -82,9 +82,14 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidators.AudioVideoValidator do
     url
     |> Enum.concat(mpeg_url["tag"] || [])
     |> Enum.find(fn
-      %{"mediaType" => mime_type} -> String.starts_with?(mime_type, ["video/", "audio/"])
-      %{"mimeType" => mime_type} -> String.starts_with?(mime_type, ["video/", "audio/"])
-      _ -> false
+      %{"mediaType" => mime_type} ->
+        String.starts_with?(mime_type, ["video/", "audio/", "image/"])
+
+      %{"mimeType" => mime_type} ->
+        String.starts_with?(mime_type, ["video/", "audio/", "image/"])
+
+      _ ->
+        false
     end)
   end
 
@@ -137,8 +142,9 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidators.AudioVideoValidator do
 
   defp validate_data(data_cng) do
     data_cng
-    |> validate_inclusion(:type, ["Audio", "Video"])
+    |> validate_inclusion(:type, ~w[Audio Image Video])
     |> validate_required([:id, :actor, :attributedTo, :type, :context, :attachment])
+    |> validate_length(:attachment, min: 1)
     |> CommonValidations.validate_any_presence([:cc, :to])
     |> CommonValidations.validate_fields_match([:actor, :attributedTo])
     |> CommonValidations.validate_actor_presence()

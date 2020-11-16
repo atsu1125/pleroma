@@ -21,7 +21,7 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidator do
   alias Pleroma.Web.ActivityPub.ObjectValidators.AnnounceValidator
   alias Pleroma.Web.ActivityPub.ObjectValidators.AnswerValidator
   alias Pleroma.Web.ActivityPub.ObjectValidators.ArticleNoteValidator
-  alias Pleroma.Web.ActivityPub.ObjectValidators.AudioVideoValidator
+  alias Pleroma.Web.ActivityPub.ObjectValidators.AudioImageVideoValidator
   alias Pleroma.Web.ActivityPub.ObjectValidators.BlockValidator
   alias Pleroma.Web.ActivityPub.ObjectValidators.ChatMessageValidator
   alias Pleroma.Web.ActivityPub.ObjectValidators.CreateChatMessageValidator
@@ -102,7 +102,7 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidator do
         %{"type" => "Create", "object" => %{"type" => objtype} = object} = create_activity,
         meta
       )
-      when objtype in ~w[Question Answer Audio Video Event Article Note] do
+      when objtype in ~w[Question Answer Audio Video Image Event Article Note] do
     with {:ok, object_data} <- cast_and_apply(object),
          meta = Keyword.put(meta, :object_data, object_data |> stringify_keys),
          {:ok, create_activity} <-
@@ -115,13 +115,14 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidator do
   end
 
   def validate(%{"type" => type} = object, meta)
-      when type in ~w[Event Question Audio Video Article Note] do
+      when type in ~w[Event Question Audio Video Image Article Note] do
     validator =
       case type do
         "Event" -> EventValidator
         "Question" -> QuestionValidator
-        "Audio" -> AudioVideoValidator
-        "Video" -> AudioVideoValidator
+        "Audio" -> AudioImageVideoValidator
+        "Video" -> AudioImageVideoValidator
+        "Image" -> AudioImageVideoValidator
         "Article" -> ArticleNoteValidator
         "Note" -> ArticleNoteValidator
       end
@@ -187,8 +188,8 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidator do
     AnswerValidator.cast_and_apply(object)
   end
 
-  def cast_and_apply(%{"type" => type} = object) when type in ~w[Audio Video] do
-    AudioVideoValidator.cast_and_apply(object)
+  def cast_and_apply(%{"type" => type} = object) when type in ~w[Audio Image Video] do
+    AudioImageVideoValidator.cast_and_apply(object)
   end
 
   def cast_and_apply(%{"type" => "Event"} = object) do
