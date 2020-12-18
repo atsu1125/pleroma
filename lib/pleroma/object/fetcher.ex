@@ -51,23 +51,6 @@ defmodule Pleroma.Object.Fetcher do
     end
   end
 
-  defp reinject_object(%Object{} = object, new_data) do
-    Logger.debug("Reinjecting object #{new_data["id"]}")
-
-    with new_data <- Transmogrifier.fix_object(new_data),
-         data <- maybe_reinject_internal_fields(object, new_data),
-         changeset <- Object.change(object, %{data: data}),
-         changeset <- touch_changeset(changeset),
-         {:ok, object} <- Repo.insert_or_update(changeset),
-         {:ok, object} <- Object.set_cache(object) do
-      {:ok, object}
-    else
-      e ->
-        Logger.error("Error while processing object: #{inspect(e)}")
-        {:error, e}
-    end
-  end
-
   def refetch_object(%Object{data: %{"id" => id}} = object) do
     with {:local, false} <- {:local, Object.local?(object)},
          {:ok, new_data} <- fetch_and_contain_remote_object_from_id(id),
