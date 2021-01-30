@@ -8,9 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- **Breaking:** Changed `mix pleroma.user toggle_confirmed` to `mix pleroma.user confirm`
+- **Breaking**: Changed `mix pleroma.user toggle_confirmed` to `mix pleroma.user confirm`
+- **Breaking**: Changed `mix pleroma.user toggle_activated` to `mix pleroma.user activate/deactivate`
 - **Breaking**: AdminAPI changed User field `confirmation_pending` to `is_confirmed`
 - **Breaking**: AdminAPI changed User field `approval_pending` to `is_approved`
+- **Breaking**: AdminAPI changed User field `deactivated` to `is_active`
 - Polls now always return a `voters_count`, even if they are single-choice.
 - Admin Emails: The ap id is used as the user link in emails now.
 - Improved registration workflow for email confirmation and account approval modes.
@@ -19,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Breaking** Entries for simple_policy, transparency_exclusions and quarantined_instances now list both the instance and a reason.
 - Admin API: Reports now ordered by newest
 - Deprecated `Pleroma.Uploaders.S3, :public_endpoint`. Now `Pleroma.Upload, :base_url` is the standard configuration key for all uploaders.
+- Improved Apache webserver support: updated sample configuration, MediaProxy cache invalidation verified with the included sample script
 
 ### Added
 
@@ -36,7 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - OAuth improvements and fixes: more secure session-based authentication (by token that could be revoked anytime), ability to revoke belonging OAuth token from any client etc.
 - Ability to set ActivityPub aliases for follower migration.
 - Configurable background job limits for RichMedia (link previews) and MediaProxyWarmingPolicy
-
+- Ability to define custom HTTP headers per each frontend
 
 <details>
   <summary>API Changes</summary>
@@ -61,6 +64,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   <summary>API Changes</summary>
   - Mastodon API: Current user is now included in conversation if it's the only participant.
   - Mastodon API: Fixed last_status.account being not filled with account data.
+  - Mastodon API: Fix not being able to add or remove multiple users at once in lists.
+  - Mastodon API: Fixed own_votes being not returned with poll data.
 </details>
 
 ## Unreleased (Patch)
