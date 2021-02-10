@@ -108,7 +108,7 @@ defmodule Pleroma.Factory do
     %Pleroma.Object{data: data} = note_factory(attrs)
     %Pleroma.Object{data: Map.merge(data, %{"to" => [data["actor"] <> "/followers"]})}
   end
-  
+
   def attachment_note_factory(attrs \\ %{}) do
     user = attrs[:user] || insert(:user)
     {length, attrs} = Map.pop(attrs, :length, 1)

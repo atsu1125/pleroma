@@ -118,8 +118,7 @@ defmodule Pleroma.Config.DeprecationWarnings do
   end
 
   def check_transparency_exclusions_tuples do
-    has_strings =
-      Config.get([:mrf, :transparency_exclusions]) |> Enum.any?(&is_binary/1)
+    has_strings = Config.get([:mrf, :transparency_exclusions]) |> Enum.any?(&is_binary/1)
 
     if has_strings do
       Logger.warn("""
