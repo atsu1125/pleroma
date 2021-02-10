@@ -146,6 +146,7 @@ defmodule Pleroma.User do
     field(:inbox, :string)
     field(:shared_inbox, :string)
     field(:accepts_chat_messages, :boolean, default: nil)
+    field(:last_active_at, :naive_datetime)
 
     embeds_one(
       :notification_settings,
@@ -797,7 +798,7 @@ defmodule Pleroma.User do
   end
 
   def post_register_action(%User{is_confirmed: false} = user) do
-    with {:ok, _} <- try_send_confirmation_email(user) do
+    with {:ok, _} <- maybe_send_confirmation_email(user) do
       {:ok, user}
     end
   end
@@ -813,9 +814,10 @@ defmodule Pleroma.User do
     with {:ok, user} <- autofollow_users(user),
          {:ok, _} <- autofollowing_users(user),
          {:ok, user} <- set_cache(user),
-         {:ok, _} <- send_welcome_email(user),
-         {:ok, _} <- send_welcome_message(user),
-         {:ok, _} <- send_welcome_chat_message(user) do
+         {:ok, _} <- maybe_send_registration_email(user),
+         {:ok, _} <- maybe_send_welcome_email(user),
+         {:ok, _} <- maybe_send_welcome_message(user),
+         {:ok, _} <- maybe_send_welcome_chat_message(user) do
       {:ok, user}
     end
   end
@@ -840,7 +842,7 @@ defmodule Pleroma.User do
     {:ok, :enqueued}
   end
 
-  def send_welcome_message(user) do
+  defp maybe_send_welcome_message(user) do
     if User.WelcomeMessage.enabled?() do
       User.WelcomeMessage.post_message(user)
       {:ok, :enqueued}
@@ -849,7 +851,7 @@ defmodule Pleroma.User do
     end
   end
 
-  def send_welcome_chat_message(user) do
+  defp maybe_send_welcome_chat_message(user) do
     if User.WelcomeChatMessage.enabled?() do
       User.WelcomeChatMessage.post_message(user)
       {:ok, :enqueued}
@@ -858,7 +860,7 @@ defmodule Pleroma.User do
     end
   end
 
-  def send_welcome_email(%User{email: email} = user) when is_binary(email) do
+  defp maybe_send_welcome_email(%User{email: email} = user) when is_binary(email) do
     if User.WelcomeEmail.enabled?() do
       User.WelcomeEmail.send_email(user)
       {:ok, :enqueued}
@@ -867,10 +869,10 @@ defmodule Pleroma.User do
     end
   end
 
-  def send_welcome_email(_), do: {:ok, :noop}
+  defp maybe_send_welcome_email(_), do: {:ok, :noop}
 
-  @spec try_send_confirmation_email(User.t()) :: {:ok, :enqueued | :noop}
-  def try_send_confirmation_email(%User{is_confirmed: false, email: email} = user)
+  @spec maybe_send_confirmation_email(User.t()) :: {:ok, :enqueued | :noop}
+  def maybe_send_confirmation_email(%User{is_confirmed: false, email: email} = user)
       when is_binary(email) do
     if Config.get([:instance, :account_activation_required]) do
       send_confirmation_email(user)
@@ -880,7 +882,7 @@ defmodule Pleroma.User do
     end
   end
 
-  def try_send_confirmation_email(_), do: {:ok, :noop}
+  def maybe_send_confirmation_email(_), do: {:ok, :noop}
 
   @spec send_confirmation_email(Uset.t()) :: User.t()
   def send_confirmation_email(%User{} = user) do
@@ -890,6 +892,24 @@ defmodule Pleroma.User do
 
     user
   end
+
+  @spec maybe_send_registration_email(User.t()) :: {:ok, :enqueued | :noop}
+  defp maybe_send_registration_email(%User{email: email} = user) when is_binary(email) do
+    with false <- User.WelcomeEmail.enabled?(),
+         false <- Config.get([:instance, :account_activation_required], false),
+         false <- Config.get([:instance, :account_approval_required], false) do
+      user
+      |> Pleroma.Emails.UserEmail.successful_registration_email()
+      |> Pleroma.Emails.Mailer.deliver_async()
+
+      {:ok, :enqueued}
+    else
+      _ ->
+        {:ok, :noop}
+    end
+  end
+
+  defp maybe_send_registration_email(_), do: {:ok, :noop}
 
   def needs_update?(%User{local: true}), do: false
 
@@ -2030,6 +2050,15 @@ defmodule Pleroma.User do
     |> hd()
   end
 
+  def full_nickname(%User{} = user) do
+    if String.contains?(user.nickname, "@") do
+      user.nickname
+    else
+      %{host: host} = URI.parse(user.ap_id)
+      user.nickname <> "@" <> host
+    end
+  end
+
   def full_nickname(nickname_or_mention),
     do: String.trim_leading(nickname_or_mention, "@")
 
@@ -2443,5 +2472,20 @@ defmodule Pleroma.User do
 
   def get_host(%User{ap_id: ap_id} = _user) do
     URI.parse(ap_id).host
+  end
+
+  def update_last_active_at(%__MODULE__{local: true} = user) do
+    user
+    |> cast(%{last_active_at: NaiveDateTime.utc_now()}, [:last_active_at])
+    |> update_and_set_cache()
+  end
+
+  def active_user_count(weeks \\ 4) do
+    active_after = Timex.shift(NaiveDateTime.utc_now(), weeks: -weeks)
+
+    __MODULE__
+    |> where([u], u.last_active_at >= ^active_after)
+    |> where([u], u.local == true)
+    |> Repo.aggregate(:count)
   end
 end
